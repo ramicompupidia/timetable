@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#111111" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" href="icon-192.png" />
+  <title>시간표</title>
+  <style>
+    :root{
+      --bg:#0b0c10;
+      --card:#111217;
+      --grid:#1e2230;
+      --text:#e9e9ef;
+      --muted:#a6a7b3;
+      --line:rgba(255,255,255,.08);
+      --radius:16px;
+    }
+    *{ box-sizing:border-box; }
+    body{
+      margin:0; background:linear-gradient(180deg,#0b0c10,#07080b);
+      color:var(--text); font-family: system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans KR", Arial, sans-serif;
+    }
+    header{
+      position:sticky; top:0; z-index:10;
+      background:rgba(11,12,16,.85); backdrop-filter: blur(10px);
+      border-bottom:1px solid var(--line);
+      padding:14px 14px 10px;
+    }
+    .toprow{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
+    h1{ font-size:18px; margin:0; letter-spacing:.2px; }
+    .btns{ display:flex; gap:8px; }
+    button{
+      appearance:none; border:1px solid var(--line); background:rgba(255,255,255,.04);
+      color:var(--text); padding:10px 12px; border-radius:999px; font-weight:600;
+    }
+    button:active{ transform:scale(.98); }
+    main{ padding:14px; }
+    .card{
+      background:rgba(255,255,255,.04);
+      border:1px solid var(--line);
+      border-radius:var(--radius);
+      overflow:hidden;
+      box-shadow: 0 10px 30px rgba(0,0,0,.35);
+    }
+    .gridWrap{ display:flex; }
+    .timeCol{
+      width:54px; flex:0 0 54px;
+      background:rgba(255,255,255,.02);
+      border-right:1px solid var(--line);
+    }
+    .timeLabel{
+      height:60px;
+      border-bottom:1px solid var(--line);
+      display:flex; align-items:flex-start; justify-content:center;
+      padding-top:6px;
+      color:var(--muted);
+      font-size:12px;
+    }
+    .week{
+      flex:1;
+      display:grid;
+      grid-template-columns: repeat(7, 1fr);
+    }
+    .dayHead{
+      height:44px;
+      border-bottom:1px solid var(--line);
+      border-right:1px solid var(--line);
+      display:flex; align-items:center; justify-content:center;
+      color:var(--muted);
+      font-size:12px;
+      background:rgba(255,255,255,.015);
+    }
+    .dayHead:last-child{ border-right:none; }
+    .dayCol{
+      position:relative;
+      height: calc(60px * 13); /* 09:00~22:00 = 13시간 */
+      border-right:1px solid var(--line);
+      background:
+        linear-gradient(to bottom, transparent 0, transparent 59px, var(--line) 60px);
+      background-size: 100% 60px;
+    }
+    .dayCol:last-child{ border-right:none; }
+    .block{
+      position:absolute;
+      left:6px; right:6px;
+      border-radius:14px;
+      padding:10px 10px;
+      border:1px solid rgba(255,255,255,.10);
+      box-shadow: 0 10px 18px rgba(0,0,0,.35);
+      overflow:hidden;
+    }
+    .sub{ font-size:12px; color:rgba(255,255,255,.85); margin-top:4px; }
+    .title{ font-weight:800; letter-spacing:.1px; line-height:1.15; }
+    .meta{ font-size:11px; color:rgba(255,255,255,.75); margin-top:6px; }
+    .hint{
+      padding:12px 14px;
+      color:var(--muted);
+      font-size:12px;
+      border-top:1px solid var(--line);
+      background:rgba(255,255,255,.02);
+    }
+
+    /* 편집 모달 */
+    dialog{
+      width:min(560px, calc(100vw - 22px));
+      border:none; border-radius:20px;
+      background:#111217; color:var(--text);
+      box-shadow: 0 20px 60px rgba(0,0,0,.6);
+    }
+    dialog::backdrop{ background: rgba(0,0,0,.55); }
+    .modalHead{ display:flex; align-items:center; justify-content:space-between; padding:14px 14px 8px; border-bottom:1px solid var(--line); }
+    .modalHead h2{ margin:0; font-size:16px; }
+    .modalBody{ padding:14px; display:grid; gap:10px; }
+    label{ font-size:12px; color:var(--muted); display:grid; gap:6px; }
+    input, select{
+      width:100%;
+      padding:12px 12px;
+      border-radius:14px;
+      border:1px solid var(--line);
+      background:rgba(255,255,255,.04);
+      color:var(--text);
+      outline:none;
+    }
+    .row{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    .modalFoot{ display:flex; gap:10px; padding:12px 14px 14px; border-top:1px solid var(--line); }
+    .danger{ border-color: rgba(255,80,80,.35); }
+    .primary{ background: rgba(255,255,255,.10); }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="toprow">
+      <h1>주간 시간표 (09:00–22:00)</h1>
+      <div class="btns">
+        <button id="addBtn">추가</button>
+        <button id="resetBtn" class="danger">초기화</button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <div class="card">
+      <div class="gridWrap">
+        <div class="timeCol" id="timeCol"></div>
+        <div style="flex:1; overflow:auto;">
+          <div class="week" id="weekHead"></div>
+          <div class="week" id="weekBody"></div>
+        </div>
+      </div>
+      <div class="hint">
+        • 블록을 누르면 수정/삭제할 수 있어요. • 데이터는 이 폰에만 저장됩니다.
+      </div>
+    </div>
+  </main>
+
+  <dialog id="editor">
+    <div class="modalHead">
+      <h2 id="modalTitle">수업 추가</h2>
+      <button id="closeBtn">닫기</button>
+    </div>
+    <div class="modalBody">
+      <label>과목명
+        <input id="fTitle" placeholder="예: 정보서비스론" />
+      </label>
+
+      <div class="row">
+        <label>요일
+          <select id="fDay">
+            <option value="0">월</option>
+            <option value="1">화</option>
+            <option value="2">수</option>
+            <option value="3">목</option>
+            <option value="4">금</option>
+            <option value="5">토</option>
+            <option value="6">일</option>
+          </select>
+        </label>
+        <label>장소(선택)
+          <input id="fPlace" placeholder="예: 301 / 온라인" />
+        </label>
+      </div>
+
+      <div class="row">
+        <label>시작 (HH:MM)
+          <input id="fStart" placeholder="09:00" />
+        </label>
+        <label>종료 (HH:MM)
+          <input id="fEnd" placeholder="10:30" />
+        </label>
+      </div>
+
+      <label>색상 (HEX, 예: #7c5cff)
+        <input id="fColor" placeholder="#7c5cff" />
+      </label>
+    </div>
+
+    <div class="modalFoot">
+      <button id="saveBtn" class="primary" style="flex:1;">저장</button>
+      <button id="deleteBtn" class="danger" style="flex:1; display:none;">삭제</button>
+    </div>
+  </dialog>
+
+  <script src="app.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('./sw.js').catch(()=>{});
+    }
+  </script>
+</body>
+</html>
